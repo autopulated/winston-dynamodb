@@ -4,10 +4,11 @@ AWS = require "aws-sdk"
 uuidV4 = require("node-uuid").v4
 _ = require "lodash"
 hostname = require("os").hostname()
+microtime = require('microtime')
 
-# Return timestamp with YYYY-MM-DD HH:mm:ss
-datify = (timestamp) ->
-    date = new Date timestamp
+# Return timestamp with YYYY-MM-DD HH:mm:ss.000000
+datify = (musecs) ->
+    date = new Date musecs/1000
     date =
         year: date.getFullYear()
         month: date.getMonth() + 1
@@ -16,13 +17,13 @@ datify = (timestamp) ->
         hour: date.getHours()
         minute: date.getMinutes()
         second: date.getSeconds()
-        millisecond: date.getMilliseconds()
+        musecs: musecs % 1000000
 
     keys = _.without Object.keys date, "year", "month", "day"
     date[key] = "0" + date[key] for key in keys when date[key] < 10
-    if date.millisecond < 100
-        date.millisecond = "0" + date.millisecond
-    "#{date.year}-#{date.month}-#{date.day} #{date.hour}:#{date.minute}:#{date.second}.#{date.millisecond}"
+    while date.musecs.toString().length < 6
+        date.musecs = "0" + date.musecs
+    "#{date.year}-#{date.month}-#{date.day} #{date.hour}:#{date.minute}:#{date.second}.#{date.musecs}"
 
 DynamoDB = exports.DynamoDB = (options = {}) ->
     regions = [
@@ -86,7 +87,7 @@ DynamoDB::log = (level, msg, meta, callback) ->
             level:
                 "S": level
             timestamp:
-                "S": datify Date.now()
+                "S": datify microtime.now()
             msg:
                 "S": msg
             hostname:

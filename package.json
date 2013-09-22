@@ -15,10 +15,12 @@
   "dependencies": {
     "aws-sdk": ">= 0.9.6",
     "node-uuid": "1.4.0",
-    "lodash": "1.0.0"
+    "lodash": "1.0.0",
+    "microtime": "*"
   },
   "devDependencies": {
-    "winston": ">= 0.5.6"
+    "winston": ">= 0.5.6",
+    "coffee": "*"
   },
   "main": "./winston-dynamodb",
   "engines": {
