@@ -25,7 +25,8 @@
       day: date.getDate(),
       hour: date.getHours(),
       minute: date.getMinutes(),
-      second: date.getSeconds()
+      second: date.getSeconds(),
+      millisecond: date.getMilliseconds()
     };
     keys = _.without(Object.keys(date, "year", "month", "day"));
     for (_i = 0, _len = keys.length; _i < _len; _i++) {
@@ -34,7 +35,10 @@
         date[key] = "0" + date[key];
       }
     }
-    return "" + date.year + "-" + date.month + "-" + date.day + " " + date.hour + ":" + date.minute + ":" + date.second;
+    if (date.millisecond < 100) {
+      date.millisecond = "0" + date.millisecond;
+    }
+    return "" + date.year + "-" + date.month + "-" + date.day + " " + date.hour + ":" + date.minute + ":" + date.second + "." + date.millisecond;
   };
 
   DynamoDB = exports.DynamoDB = function(options) {
@@ -64,6 +68,9 @@
       secretAccessKey: options.secretAccessKey,
       region: options.region
     });
+    if ('hostname' in options) {
+      hostname = options.hostname;
+    }
     this.name = "dynamodb";
     this.level = options.level || "info";
     this.db = new AWS.DynamoDB();
@@ -74,9 +81,14 @@
   util.inherits(DynamoDB, winston.Transport);
 
   DynamoDB.prototype.log = function(level, msg, meta, callback) {
-    var params,
+    var params, use_hostname,
       _this = this;
 
+    if ('hostname' in meta) {
+      use_hostname = meta.hostname;
+    } else {
+      use_hostname = hostname;
+    }
     params = {
       TableName: this.tableName,
       Item: {
@@ -90,7 +102,7 @@
           "S": msg
         },
         hostname: {
-          "S": hostname
+          "S": use_hostname
         }
       }
     };
