@@ -14,33 +14,22 @@ A DynamoDB transport for [winston][0].
 ## Options
 
 ```
-accessKeyId     : your AWS access key id
-secretAccessKey : your AWS secret access key
-region          : the region where the domain is hosted
-tableName       : DynamoDB table name
+accessKeyId            : an AWS access key id
+secretAccessKey        : an AWS secret access key
+region                 : the AWS region to use
+tableName              : DynamoDB table name (this is automatically suffixed
+                         with dates to per-week tables)
+hostname               : hostname to use in logs (used as hash key for DB table)
+provisionWriteCapacity : write capacity units to provision for active log table
+provisionReadCapacity  : read capacity units to provision for active log table
 ```
 
 ## Prerequisite
 
-Make a table with `tableName`
+The module sets up its own tables in DynamoDB (one per week). Logs are not
+automatically deleted, you must drop old tables when you no longer wish to
+access them.
 
-The table should have
-
-- hash key: (String) level
-- range key: (String) timestamp
-
-## Region
-
-Available Regions
-
-- us-east-1
-- us-west-1
-- us-west-2
-- eu-west-1
-- ap-northeast-1
-- ap-southeast-1
-- ap-southeast-2
-- sa-east-1
 
 ## AWS Credentials
 
@@ -53,6 +42,8 @@ All of these options are values that you can find from your Amazon Web Services 
   $ npm install winston-dynamodb
 ```
 
-#### Author: [JeongWoo Chang](http://twitter.com/inspiredjw)
+#### Authors
+[JeongWoo Chang](http://twitter.com/inspiredjw)
+[James Crosby](http://twitter.com/autopulated)
 
 [0]: https://github.com/flatiron/winston
