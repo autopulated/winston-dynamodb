@@ -227,7 +227,6 @@
     var set_rcap, set_wcap,
       _this = this;
 
-    console.log('downgrade table:', tableName);
     set_rcap = 1;
     set_wcap = 1;
     return this.db.client.describeTable({
@@ -239,8 +238,6 @@
         Error.captureStackTrace(err);
         return _this.emit("error", err);
       }
-      console.log(data);
-      console.log(data.Table.TableStatus, data.Table.ProvisionedThroughput.ReadCapacityUnits, data.Table.ProvisionedThroughput.WriteCapacityUnits);
       if (data.Table.TableStatus === 'ACTIVE' && (data.Table.ProvisionedThroughput.ReadCapacityUnits !== set_rcap || data.Table.ProvisionedThroughput.WriteCapacityUnits !== set_wcap)) {
         params = {
           TableName: tableName,
