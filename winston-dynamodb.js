@@ -96,18 +96,18 @@
     this.db = new AWS.DynamoDB();
     this.region = options.region;
     this.tableName = options.tableName;
-    if ('provisionReadCapacity' in options) {
+    if (options.provisionReadCapacity != null) {
       this.provisionReadCapacity = options.provisionReadCapacity;
     } else {
       this.provisionReadCapacity = 1;
     }
-    if ('provisionWriteCapacity' in options) {
+    if (options.provisionWriteCapacity != null) {
       this.provisionWriteCapacity = options.provisionWriteCapacity;
     } else {
       this.provisionWriteCapacity = 1;
     }
     this.ensureTables();
-    setInterval(this.ensureTables.bind(this), (23 + 2 * Math.random()) * 60 * 60 * 1000);
+    setInterval(this.ensureTables.bind(this), (5 + 2 * Math.random()) * 60 * 60 * 1000);
   };
 
   util.inherits(DynamoDB, winston.Transport);
@@ -122,7 +122,7 @@
       use_hostname = hostname;
     }
     params = {
-      TableName: this.tableName + '.' + formatDate(mostRecentMonday()),
+      TableName: this.tableName + '.' + formatDate(mostRecentMonday(new Date())),
       Item: {
         level: {
           "S": level
@@ -154,38 +154,50 @@
     return callback(null, true);
   };
 
-  mostRecentMonday = function() {
-    var diffToMonday, today;
+  mostRecentMonday = function(today) {
+    var diffToMonday;
 
-    today = new Date();
     diffToMonday = today.getDay() - 1;
     if (diffToMonday > 0) {
-      diffToMonday -= 7;
+      diffToMonday -= 6;
     }
     return new Date(today.getTime() + diffToMonday * 1000 * 60 * 60 * 24);
   };
 
   DynamoDB.prototype.ensureTables = function() {
-    var addFoundTables, checkFoundTables, found_tables, monday, next_week_table, require_tables, this_week_table,
+    var addFoundTables, checkFoundTables, downgrade_tables, found_tables, last_week_table, monday, next_week_table, require_tables, this_week_table, today,
       _this = this;
 
-    monday = mostRecentMonday();
+    today = new Date();
+    monday = mostRecentMonday(today);
+    require_tables = [];
+    downgrade_tables = [];
     this_week_table = this.tableName + '.' + formatDate(monday);
-    next_week_table = this.tableName + '.' + formatDate(new Date(monday.getTime() + 1000 * 60 * 60 * 24 * 7));
-    require_tables = [this_week_table, next_week_table];
-    console.log('require_tables:', require_tables);
+    require_tables.push(this_week_table);
+    if (today - monday < 12 * 60 * 60 * 1000) {
+      next_week_table = this.tableName + '.' + formatDate(new Date(monday.getTime() + 1000 * 60 * 60 * 24 * 7));
+      require_tables.push(next_week_table);
+    }
+    if (today - monday > 12 * 60 * 60 * 1000) {
+      last_week_table = this.tableName + '.' + formatDate(new Date(monday.getTime() - 1000 * 60 * 60 * 24 * 7));
+      downgrade_tables.push(last_week_table);
+    }
     found_tables = [];
     checkFoundTables = function() {
-      var onTableActive, tn, _i, _len;
+      var onTableActive, tn, _i, _j, _len, _len1;
 
-      console.log('check found tables:', found_tables);
-      for (_i = 0, _len = require_tables.length; _i < _len; _i++) {
-        tn = require_tables[_i];
+      for (_i = 0, _len = downgrade_tables.length; _i < _len; _i++) {
+        tn = downgrade_tables[_i];
+        if (__indexOf.call(found_tables, tn) >= 0) {
+          _this.downgradeTable(tn);
+        }
+      }
+      for (_j = 0, _len1 = require_tables.length; _j < _len1; _j++) {
+        tn = require_tables[_j];
         if (!(__indexOf.call(found_tables, tn) >= 0)) {
           _this.createTable(tn);
           onTableActive = function(err) {
             if (err) {
-              Error.captureStackTrace(err);
               _this.emit("error", err);
               setTimeout(_this.ensureTables, 15 * 60 * 1000);
             }
@@ -197,10 +209,8 @@
     };
     addFoundTables = function(err, data) {
       if (err) {
-        Error.captureStackTrace(err);
         return _this.emit("error", err);
       }
-      console.log('found tables:', data);
       found_tables = found_tables.concat(data.TableNames);
       if ('LastEvaluatedTableName' in data) {
         return _this.db.client.listTables({
@@ -213,11 +223,46 @@
     return this.db.client.listTables({}, addFoundTables);
   };
 
+  DynamoDB.prototype.downgradeTable = function(tableName) {
+    var set_rcap, set_wcap,
+      _this = this;
+
+    console.log('downgrade table:', tableName);
+    set_rcap = 1;
+    set_wcap = 1;
+    return this.db.client.describeTable({
+      TableName: tableName
+    }, function(err, data) {
+      var params;
+
+      if (err) {
+        Error.captureStackTrace(err);
+        return _this.emit("error", err);
+      }
+      console.log(data);
+      console.log(data.Table.TableStatus, data.Table.ProvisionedThroughput.ReadCapacityUnits, data.Table.ProvisionedThroughput.WriteCapacityUnits);
+      if (data.Table.TableStatus === 'ACTIVE' && (data.Table.ProvisionedThroughput.ReadCapacityUnits !== set_rcap || data.Table.ProvisionedThroughput.WriteCapacityUnits !== set_wcap)) {
+        params = {
+          TableName: tableName,
+          ProvisionedThroughput: {
+            ReadCapacityUnits: set_rcap,
+            WriteCapacityUnits: set_wcap
+          }
+        };
+        return _this.db.client.updateTable(params, function(err, data) {
+          if (err) {
+            Error.captureStackTrace(err);
+            return _this.emit("error", err);
+          }
+        });
+      }
+    });
+  };
+
   DynamoDB.prototype.createTable = function(tableName) {
     var table_params,
       _this = this;
 
-    console.log("create table:", tableName);
     table_params = {
       TableName: tableName,
       AttributeDefinitions: [
@@ -280,17 +325,18 @@
       var onTimeout;
 
       if (err) {
+        Error.captureStackTrace(err);
         return callback(err);
       }
-      if (data.TableStatus === "CREATING") {
+      if (data.Table.TableStatus === "CREATING") {
         onTimeout = function() {
           return _this.waitForTable(tableName, callback);
         };
         return setTimeout(onTimeout, 60 * 1000);
-      } else if (data.TableStatus === "ACTIVE") {
+      } else if (data.Table.TableStatus === "ACTIVE") {
         return callback(null);
       } else {
-        return callback("wait for table state:" + data.TableStatus);
+        return callback(new Error("wait for table state:" + data.Table.TableStatus));
       }
     });
   };

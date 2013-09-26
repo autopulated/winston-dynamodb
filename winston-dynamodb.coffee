@@ -82,19 +82,19 @@ DynamoDB = exports.DynamoDB = (options = {}) ->
     # a-z, A-Z, 0-9, _ (underscore), - (hyphen) and . (period)
     @.tableName = options.tableName
 
-    if 'provisionReadCapacity' of options
+    if options.provisionReadCapacity?
         @.provisionReadCapacity  = options.provisionReadCapacity
     else
         @.provisionReadCapacity = 1
 
-    if 'provisionWriteCapacity' of options
+    if options.provisionWriteCapacity?
         @.provisionWriteCapacity = options.provisionWriteCapacity
     else
         @.provisionWriteCapacity = 1
     
-    # make sure the table exists, and re-exec once per day
+    # make sure the table exists, and re-exec every 6 hours +- 1h
     @.ensureTables()
-    setInterval(@.ensureTables.bind(@), (23+2*Math.random())*60*60*1000)
+    setInterval(@.ensureTables.bind(@), (5+2*Math.random())*60*60*1000)
 
     return
 
@@ -108,7 +108,7 @@ DynamoDB::log = (level, msg, meta, callback) ->
         use_hostname = hostname
     # DynamoDB Options
     params =
-        TableName: (@.tableName + '.' + formatDate(mostRecentMonday()))
+        TableName: (@.tableName + '.' + formatDate(mostRecentMonday(new Date())))
         Item:
             level:
                 "S": level
@@ -130,37 +130,47 @@ DynamoDB::log = (level, msg, meta, callback) ->
 
     callback null, true
 
-mostRecentMonday = () ->
-    today = new Date()
+# possibly returns today
+mostRecentMonday = (today) ->
     diffToMonday = today.getDay() - 1
     if diffToMonday > 0
-        diffToMonday -= 7
+        diffToMonday -= 6
     return new Date(today.getTime() + diffToMonday*1000*60*60*24)
 
 # ensure that a table tableName.YYYY.MM.DD exists for monday of this week and
 # monday of next week (creating a table can take a few minutes, so best to do
 # it ahead of time)
 DynamoDB::ensureTables = () ->
-    monday = mostRecentMonday()
-    
-    this_week_table = @.tableName + '.' + formatDate(monday)
-    next_week_table = @.tableName + '.' + formatDate(new Date(monday.getTime() + 1000*60*60*24*7))
-    #last_week_table = @.tableName + '.' + formatDate(new Date(next_monday.getTime() - 1000*60*60*24*7))
+    today = new Date()
+    monday = mostRecentMonday(today)
 
-    require_tables = [
-        this_week_table, next_week_table
-    ]
-    console.log('require_tables:', require_tables)
+    require_tables = []
+    downgrade_tables = []
+
+    this_week_table = @.tableName + '.' + formatDate(monday)
+    require_tables.push(this_week_table)
+    
+    # prepare table for next week 12 hours in advance
+    if today - monday < 12*60*60*1000
+        next_week_table = @.tableName + '.' + formatDate(new Date(monday.getTime() + 1000*60*60*24*7))
+        require_tables.push(next_week_table)
+    
+    # after 12 hours into the new week
+    if today - monday > 12*60*60*1000
+        last_week_table = @.tableName + '.' + formatDate(new Date(monday.getTime() - 1000*60*60*24*7))
+        downgrade_tables.push(last_week_table)
+
     found_tables = []
     # fat arrow = bind this (@)
     checkFoundTables = () =>
-        console.log('check found tables:', found_tables)
+        for tn in downgrade_tables
+            if tn in found_tables
+                @.downgradeTable(tn)
         for tn in require_tables
             if not (tn in found_tables)
                 @.createTable(tn)
                 onTableActive = (err) =>
                     if err
-                        Error.captureStackTrace(err)
                         @.emit "error", err
                         # if there's an error do retry, but not for a while
                         setTimeout(@.ensureTables, 15*60*1000)
@@ -172,9 +182,7 @@ DynamoDB::ensureTables = () ->
 
     addFoundTables = (err, data) =>
         if err
-            Error.captureStackTrace(err)
             return @.emit "error", err
-        console.log('found tables:', data)
         found_tables =  found_tables.concat(data.TableNames)
         if 'LastEvaluatedTableName' of data
             @.db.client.listTables({ExclusiveStartTableName:data.LastEvaluatedTableName},addFoundTables)
@@ -182,8 +190,27 @@ DynamoDB::ensureTables = () ->
             checkFoundTables()
     @.db.client.listTables({}, addFoundTables)
 
+DynamoDB::downgradeTable = (tableName) ->
+    set_rcap = 1
+    set_wcap = 1
+    @.db.client.describeTable {TableName:tableName}, (err, data) =>
+        if err
+            Error.captureStackTrace(err)
+            return @.emit "error", err
+        if data.Table.TableStatus == 'ACTIVE' and
+            (data.Table.ProvisionedThroughput.ReadCapacityUnits != set_rcap or
+             data.Table.ProvisionedThroughput.WriteCapacityUnits != set_wcap)
+            params =
+                TableName:tableName
+                ProvisionedThroughput:
+                    ReadCapacityUnits:set_rcap
+                    WriteCapacityUnits:set_wcap
+            @.db.client.updateTable params, (err, data) =>
+                if err
+                    Error.captureStackTrace(err)
+                    return @.emit "error", err
+
 DynamoDB::createTable = (tableName) ->
-    console.log("create table:", tableName)
     table_params =
         TableName:tableName
         AttributeDefinitions:[
@@ -214,16 +241,17 @@ DynamoDB::createTable = (tableName) ->
 DynamoDB::waitForTable = (tableName, callback) ->
     @.db.client.describeTable {TableName:tableName}, (err, data) =>
         if err
+            Error.captureStackTrace(err)
             return callback(err)
-        if data.TableStatus == "CREATING"
+        if data.Table.TableStatus == "CREATING"
             # keep waiting
             onTimeout = () =>
                 @.waitForTable(tableName, callback)
             setTimeout(onTimeout, 60*1000)
-        else if data.TableStatus == "ACTIVE"
+        else if data.Table.TableStatus == "ACTIVE"
             return callback(null)
         else
-            return callback("wait for table state:" + data.TableStatus)
+            return callback(new Error("wait for table state:" + data.Table.TableStatus))
 
 # Add DynamoDB to the transports by winston
 winston.transports.DynamoDB = DynamoDB
