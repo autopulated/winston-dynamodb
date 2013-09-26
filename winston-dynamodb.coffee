@@ -231,7 +231,7 @@ DynamoDB::createTable = (tableName) ->
             Projection:{ProjectionType:'KEYS_ONLY'}}
         ]
         ProvisionedThroughput:
-            ReadCapacityUnits:@.provisionWriteCapacity
+            ReadCapacityUnits:@.provisionReadCapacity
             WriteCapacityUnits:@.provisionWriteCapacity
     @.db.client.createTable table_params, (err, data) =>
         if err

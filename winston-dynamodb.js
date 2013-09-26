@@ -301,7 +301,7 @@
         }
       ],
       ProvisionedThroughput: {
-        ReadCapacityUnits: this.provisionWriteCapacity,
+        ReadCapacityUnits: this.provisionReadCapacity,
         WriteCapacityUnits: this.provisionWriteCapacity
       }
     };
