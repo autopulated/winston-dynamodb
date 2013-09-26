@@ -12,7 +12,6 @@ A DynamoDB transport for [winston][0].
 ```
 
 ## Options
-
 ```
 accessKeyId            : an AWS access key id
 secretAccessKey        : an AWS secret access key
@@ -24,26 +23,26 @@ provisionWriteCapacity : write capacity units to provision for active log table
 provisionReadCapacity  : read capacity units to provision for active log table
 ```
 
-## Prerequisite
-
+## DynamoDB Tables
 The module sets up its own tables in DynamoDB (one per week). Logs are not
 automatically deleted, you must drop old tables when you no longer wish to
 access them.
 
+The provisioned read and write capacity of tables is automatically set to 1
+when they are no longer actively being used for logging.
+
 
 ## AWS Credentials
-
 All of these options are values that you can find from your Amazon Web Services account: 'accessKeyId', 'secretAccessKey' and 'awsAccountId'.
 
 ## Installation
-
 ``` bash
   $ npm install winston
   $ npm install winston-dynamodb
 ```
 
 #### Authors
-[JeongWoo Chang](http://twitter.com/inspiredjw)
+[JeongWoo Chang](http://twitter.com/inspiredjw), 
 [James Crosby](http://twitter.com/autopulated)
 
 [0]: https://github.com/flatiron/winston
