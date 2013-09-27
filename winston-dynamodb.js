@@ -157,9 +157,9 @@
   mostRecentMonday = function(today) {
     var diffToMonday;
 
-    diffToMonday = today.getDay() - 1;
+    diffToMonday = 1 - today.getDay();
     if (diffToMonday > 0) {
-      diffToMonday -= 6;
+      diffToMonday -= 7;
     }
     return new Date(today.getTime() + diffToMonday * 1000 * 60 * 60 * 24);
   };

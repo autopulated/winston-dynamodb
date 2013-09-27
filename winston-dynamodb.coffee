@@ -132,9 +132,9 @@ DynamoDB::log = (level, msg, meta, callback) ->
 
 # possibly returns today
 mostRecentMonday = (today) ->
-    diffToMonday = today.getDay() - 1
+    diffToMonday = 1-today.getDay()
     if diffToMonday > 0
-        diffToMonday -= 6
+        diffToMonday -= 7
     return new Date(today.getTime() + diffToMonday*1000*60*60*24)
 
 # ensure that a table tableName.YYYY.MM.DD exists for monday of this week and
