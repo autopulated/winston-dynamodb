@@ -199,7 +199,7 @@
           onTableActive = function(err) {
             if (err) {
               _this.emit("error", err);
-              setTimeout(_this.ensureTables, 15 * 60 * 1000);
+              setTimeout(_this.ensureTables.bind(_this), 15 * 60 * 1000);
             }
             return _this.ensureTables();
           };

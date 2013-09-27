@@ -173,7 +173,7 @@ DynamoDB::ensureTables = () ->
                     if err
                         @.emit "error", err
                         # if there's an error do retry, but not for a while
-                        setTimeout(@.ensureTables, 15*60*1000)
+                        setTimeout(@.ensureTables.bind(@), 15*60*1000)
                     @.ensureTables()
                 # as soon as we've set one table to create, wait for it to be
                 # created before trying to create any more
