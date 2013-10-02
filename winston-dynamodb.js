@@ -161,25 +161,27 @@
     if (diffToMonday > 0) {
       diffToMonday -= 7;
     }
-    return new Date(today.getTime() + diffToMonday * 1000 * 60 * 60 * 24);
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday);
   };
 
   DynamoDB.prototype.ensureTables = function() {
-    var addFoundTables, checkFoundTables, downgrade_tables, found_tables, last_week_table, monday, next_week_table, require_tables, this_week_table, today,
+    var addFoundTables, checkFoundTables, downgrade_tables, found_tables, last_monday, last_week_table, monday, next_monday, next_week_table, require_tables, this_week_table, today,
       _this = this;
 
-    today = new Date();
+    today = new Date(new Date().getTime());
     monday = mostRecentMonday(today);
+    next_monday = new Date(monday.getTime() + 1000 * 60 * 60 * 24 * 7);
+    last_monday = new Date(monday.getTime() - 1000 * 60 * 60 * 24 * 7);
     require_tables = [];
     downgrade_tables = [];
     this_week_table = this.tableName + '.' + formatDate(monday);
     require_tables.push(this_week_table);
-    if (today - monday < 12 * 60 * 60 * 1000) {
-      next_week_table = this.tableName + '.' + formatDate(new Date(monday.getTime() + 1000 * 60 * 60 * 24 * 7));
+    if (next_monday - today < 12 * 60 * 60 * 1000) {
+      next_week_table = this.tableName + '.' + formatDate(next_monday);
       require_tables.push(next_week_table);
     }
     if (today - monday > 12 * 60 * 60 * 1000) {
-      last_week_table = this.tableName + '.' + formatDate(new Date(monday.getTime() - 1000 * 60 * 60 * 24 * 7));
+      last_week_table = this.tableName + '.' + formatDate(last_monday);
       downgrade_tables.push(last_week_table);
     }
     found_tables = [];

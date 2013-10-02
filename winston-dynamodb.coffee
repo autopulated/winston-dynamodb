@@ -135,14 +135,16 @@ mostRecentMonday = (today) ->
     diffToMonday = 1-today.getDay()
     if diffToMonday > 0
         diffToMonday -= 7
-    return new Date(today.getTime() + diffToMonday*1000*60*60*24)
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday)
 
 # ensure that a table tableName.YYYY.MM.DD exists for monday of this week and
 # monday of next week (creating a table can take a few minutes, so best to do
 # it ahead of time)
 DynamoDB::ensureTables = () ->
-    today = new Date()
-    monday = mostRecentMonday(today)
+    today       = new Date(new Date().getTime())
+    monday      = mostRecentMonday(today)
+    next_monday = new Date(monday.getTime() + 1000*60*60*24*7)
+    last_monday = new Date(monday.getTime() - 1000*60*60*24*7)
 
     require_tables = []
     downgrade_tables = []
@@ -151,15 +153,15 @@ DynamoDB::ensureTables = () ->
     require_tables.push(this_week_table)
     
     # prepare table for next week 12 hours in advance
-    if today - monday < 12*60*60*1000
-        next_week_table = @.tableName + '.' + formatDate(new Date(monday.getTime() + 1000*60*60*24*7))
+    if next_monday - today < 12*60*60*1000
+        next_week_table = @.tableName + '.' + formatDate(next_monday)
         require_tables.push(next_week_table)
     
     # after 12 hours into the new week
     if today - monday > 12*60*60*1000
-        last_week_table = @.tableName + '.' + formatDate(new Date(monday.getTime() - 1000*60*60*24*7))
+        last_week_table = @.tableName + '.' + formatDate(last_monday)
         downgrade_tables.push(last_week_table)
-
+    
     found_tables = []
     # fat arrow = bind this (@)
     checkFoundTables = () =>

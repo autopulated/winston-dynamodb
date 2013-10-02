@@ -1,7 +1,7 @@
 {
   "name": "winston-dynamodb",
   "description": "A Winston transport for Amazon DynamoDB",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contributors": ["JeongWoo Chang <inspired.jw@gmail.com>", "James Crosby <autopulated@gmail.com>"],
   "homepage": "https://github.com/inspiredjw/winston-dynamodb",
   "repository": {
